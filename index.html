@@ -3,154 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParaLog</title>
+    <title>ParaLog Pro</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
     <style>
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: rgba(255,255,255,0.05); }
-        .glider-row { display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding: 5px 0; }
-        .settings-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-top: 30px; border: 1px dashed #555; }
+        nav { display: flex; gap: 5px; margin-bottom: 20px; justify-content: center; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        nav button { padding: 5px 10px; font-size: 0.8rem; }
+        .page { display: none; }
+        .active-page { display: block; }
+        .stats-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; }
+        .stats-summary h2 { margin: 0; color: #007bff; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 4px; }
+        .delete-btn { background: #ff4444; color: white; padding: 2px 8px; border: none; border-radius: 4px; }
+        .input-group { margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-    <h1>🪂 ParaLog</h1>
+    <nav>
+        <button onclick="showPage('log-page')">Main</button>
+        <button onclick="showPage('stats-page')">Detailed Stats</button>
+        <button onclick="showPage('gliders-page')">Wings</button>
+        <button onclick="showPage('sites-page')">Sites</button>
+        <button onclick="showPage('settings-page')">⚙️</button>
+    </nav>
 
-    <section id="dashboard">
-        <div class="stats-grid">
-            <div class="card">
+    <div id="log-page" class="page active-page">
+        <div class="stats-summary">
+            <div>
                 <small>Total Flights</small>
-                <h2 id="stat-total-flights">0</h2>
+                <h2 id="main-total-flights">0</h2>
             </div>
-            <div class="card">
-                <small>Total Duration</small>
-                <h2 id="stat-total-time">0h 0m</h2>
+            <div>
+                <small>Total Airtime</small>
+                <h2 id="main-total-time">0h 0m</h2>
             </div>
         </div>
-        <h3>Stats per Glider</h3>
-        <div id="glider-stats-container"><p>No data</p></div>
-    </section>
 
-    <hr>
+        <h3>Log New Flight</h3>
+        <div class="input-group">
+            <label>Date</label>
+            <input type="date" id="flight-date">
+            
+            <label>Glider *</label>
+            <select id="glider-select"></select>
+            
+            <label>Take-off Site *</label>
+            <select id="site-select"></select>
 
-    <section id="log-flight">
-        <h3>Log Flight</h3>
-        <label>Glider</label>
-        <select id="glider-select">
-            <option value="Ozone Mojo">Ozone Mojo</option>
-            <option value="Niviuk Hook">Niviuk Hook</option>
-            <option value="Advance Alpha">Advance Alpha</option>
-        </select>
+            <label>Distance (km)</label>
+            <input type="number" id="distance" placeholder="Optional">
 
-        <label>Take-off</label>
-        <input type="text" id="takeoff" placeholder="Location" required>
-
-        <label>Distance (km)</label>
-        <input type="number" id="distance" placeholder="0">
-
-        <label>Duration</label>
-        <div style="display: flex; gap: 10px;">
-            <input type="number" id="dur-h" placeholder="Hrs">
-            <input type="number" id="dur-m" placeholder="Min">
+            <label>Duration</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="dur-h" placeholder="Hrs">
+                <input type="number" id="dur-m" placeholder="Min">
+            </div>
+            <button onclick="saveFlight()" style="width:100%; background: #007bff; color:white; margin-top: 10px;">Save Flight</button>
         </div>
-        <button onclick="saveFlight()" style="width: 100%; background: #007bff; color: white;">Save Flight</button>
-    </section>
+    </div>
 
-    <section class="settings-box">
-        <h3>Initial Offsets</h3>
-        <p><small>Enter values from your previous logbooks here:</small></p>
-        
-        <label>Legacy Flight Count:</label>
-        <input type="number" id="legacy-count-input" value="0" oninput="updateSettings()">
+    <div id="stats-page" class="page">
+        <h2>Stats per Glider</h2>
+        <div id="glider-stats-list"></div>
+    </div>
 
-        <label>Legacy Hours Offset:</label>
-        <input type="number" id="legacy-hours-input" value="0" oninput="updateSettings()">
+    <div id="gliders-page" class="page">
+        <h2>Manage Wings</h2>
+        <input type="text" id="new-glider" placeholder="Wing Name">
+        <button onclick="addItem('gliders', 'new-glider')">Add Wing</button>
+        <hr>
+        <div id="glider-list"></div>
+    </div>
+
+    <div id="sites-page" class="page">
+        <h2>Manage Sites</h2>
+        <input type="text" id="new-site" placeholder="Site Name">
+        <button onclick="addItem('sites', 'new-site')">Add Site</button>
+        <hr>
+        <div id="site-list"></div>
+    </div>
+
+    <div id="settings-page" class="page">
+        <h2>Legacy & Data</h2>
+        <label>Legacy Flight Count</label>
+        <input type="number" id="legacy-count-input" value="0" oninput="updateLegacy()">
         
-        <button onclick="exportCSV()" style="width: 100%; margin-top: 10px;">Export CSV</button>
-    </section>
+        <label>Legacy Hours Offset</label>
+        <input type="number" id="legacy-hours-input" value="0" oninput="updateLegacy()">
+        
+        <hr>
+        <button onclick="exportCSV()" style="width:100%">Export CSV</button>
+        <button onclick="clearAllData()" style="width:100%; background:#444; margin-top:10px;">Delete All Data</button>
+    </div>
 
     <script>
-        // Load flights from storage
         let flights = JSON.parse(localStorage.getItem('flights')) || [];
+        let gliders = JSON.parse(localStorage.getItem('gliders')) || [];
+        let sites = JSON.parse(localStorage.getItem('sites')) || [];
 
-        // Load legacy values from storage on startup
-        window.onload = () => {
-            document.getElementById('legacy-count-input').value = localStorage.getItem('legacyCount') || 0;
-            document.getElementById('legacy-hours-input').value = localStorage.getItem('legacyHours') || 0;
-            calculateStats();
-        };
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+            document.getElementById(pageId).classList.add('active-page');
+            refreshUI();
+        }
 
-        function updateSettings() {
-            localStorage.setItem('legacyCount', document.getElementById('legacy-count-input').value || 0);
-            localStorage.setItem('legacyHours', document.getElementById('legacy-hours-input').value || 0);
-            calculateStats();
+        function addItem(type, inputId) {
+            const val = document.getElementById(inputId).value.trim();
+            if(!val) return;
+            if(type === 'gliders') gliders.push(val);
+            else sites.push(val);
+            saveData();
+            document.getElementById(inputId).value = "";
+            refreshUI();
+        }
+
+        function deleteItem(type, index) {
+            if(type === 'gliders') gliders.splice(index, 1);
+            else sites.splice(index, 1);
+            saveData();
+            refreshUI();
         }
 
         function saveFlight() {
-            const takeoff = document.getElementById('takeoff').value;
-            if (!takeoff) return alert("Take-off is mandatory");
-
-            const flight = {
-                glider: document.getElementById('glider-select').value,
-                takeoff: takeoff,
-                distance: document.getElementById('distance').value || 0,
-                duration: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + 
-                          (parseInt(document.getElementById('dur-m').value) || 0),
-                date: new Date().toLocaleDateString()
-            };
-
-            flights.push(flight);
-            localStorage.setItem('flights', JSON.stringify(flights));
+            const date = document.getElementById('flight-date').value;
+            const g = document.getElementById('glider-select').value;
+            const s = document.getElementById('site-select').value;
             
-            // Clear form
-            document.getElementById('takeoff').value = "";
+            if(!date || !g || !s) return alert("Date, Glider, and Site are required.");
+
+            const f = {
+                date: date,
+                glider: g,
+                site: s,
+                dist: document.getElementById('distance').value || 0,
+                dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
+            };
+            
+            flights.push(f);
+            saveData();
+            
+            // Reset form
             document.getElementById('distance').value = "";
             document.getElementById('dur-h').value = "";
             document.getElementById('dur-m').value = "";
             
-            calculateStats();
+            alert("Flight saved!");
+            refreshUI();
         }
 
-        function calculateStats() {
-            const offsetCount = parseInt(localStorage.getItem('legacyCount')) || 0;
-            const offsetHours = parseInt(localStorage.getItem('legacyHours')) || 0;
-
-            const totalFlights = flights.length + offsetCount;
-            const totalMinutes = flights.reduce((s, f) => s + f.duration, 0) + (offsetHours * 60);
-
-            document.getElementById('stat-total-flights').innerText = totalFlights;
-            document.getElementById('stat-total-time').innerText = 
-                `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
-
-            renderGliderTable();
+        function updateLegacy() {
+            localStorage.setItem('legacyCount', document.getElementById('legacy-count-input').value || 0);
+            localStorage.setItem('legacyHours', document.getElementById('legacy-hours-input').value || 0);
+            refreshUI();
         }
 
-        function renderGliderTable() {
-            const stats = {};
+        function refreshUI() {
+            // Totals Math
+            const offC = parseInt(localStorage.getItem('legacyCount')) || 0;
+            const offH = parseInt(localStorage.getItem('legacyHours')) || 0;
+            const totalF = flights.length + offC;
+            const totalM = flights.reduce((sum, f) => sum + f.dur, 0) + (offH * 60);
+
+            // Update Main Page Stats
+            document.getElementById('main-total-flights').innerText = totalF;
+            document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
+
+            // Update Dropdowns
+            document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
+            document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
+
+            // Update Detailed Stats List
+            const gStats = {};
             flights.forEach(f => {
-                if (!stats[f.glider]) stats[f.glider] = { count: 0, time: 0 };
-                stats[f.glider].count++;
-                stats[f.glider].time += f.duration;
+                if(!gStats[f.glider]) gStats[f.glider] = {c:0, t:0};
+                gStats[f.glider].c++;
+                gStats[f.glider].t += f.dur;
             });
+            document.getElementById('glider-stats-list').innerHTML = Object.entries(gStats).map(([name, d]) => 
+                `<div class="list-item"><span>${name}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`
+            ).join('') || "No logged flight data.";
 
-            let html = "";
-            for (const [name, data] of Object.entries(stats)) {
-                html += `<div class="glider-row"><span>${name}</span><span>${data.count} fl | ${Math.floor(data.time/60)}h ${data.time%60}m</span></div>`;
-            }
-            document.getElementById('glider-stats-container').innerHTML = html || "<p>No flights logged</p>";
+            // Update Settings Lists
+            document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item">${g} <button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
+            document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item">${s} <button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div>`).join('');
+        }
+
+        function saveData() {
+            localStorage.setItem('flights', JSON.stringify(flights));
+            localStorage.setItem('gliders', JSON.stringify(gliders));
+            localStorage.setItem('sites', JSON.stringify(sites));
         }
 
         function exportCSV() {
-            let csv = "Date,Glider,Takeoff,Distance,DurationMin\n";
-            flights.forEach(f => csv += `${f.date},${f.glider},${f.takeoff},${f.distance},${f.duration}\n`);
-            const blob = new Blob([csv], { type: 'text/csv' });
+            let csv = "Date,Glider,Site,DistanceKM,DurationMin\n";
+            flights.forEach(f => csv += `${f.date},${f.glider},${f.site},${f.dist},${f.dur}\n`);
+            const blob = new Blob([csv], {type:'text/csv'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'logbook.csv';
+            a.download = 'paralog_export.csv';
             a.click();
         }
+
+        function clearAllData() {
+            if(confirm("Permanently delete everything?")) { localStorage.clear(); location.reload(); }
+        }
+
+        window.onload = () => {
+            document.getElementById('flight-date').valueAsDate = new Date();
+            document.getElementById('legacy-count-input').value = localStorage.getItem('legacyCount') || 0;
+            document.getElementById('legacy-hours-input').value = localStorage.getItem('legacyHours') || 0;
+            refreshUI();
+        };
     </script>
 </body>
 </html>
