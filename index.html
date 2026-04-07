@@ -117,6 +117,19 @@
         let sites = JSON.parse(localStorage.getItem('sites')) || [];
         let editingFlightIndex = null;
 
+        // Helper to ensure dates are always stored as YYYY-MM-DD
+        function formatToISO(dateInput) {
+            const d = new Date(dateInput);
+            return isNaN(d.getTime()) ? dateInput : d.toISOString().split('T')[0];
+        }
+
+        // Helper to display dates nicely in the UI
+        function formatDateDisplay(dateStr) {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
             document.getElementById(pageId).classList.add('active-page');
@@ -156,18 +169,23 @@
             editingFlightIndex = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
             if (editingFlightIndex === -1) return;
             const f = flights[editingFlightIndex];
+
             showPage('log-page');
-            document.getElementById('flight-date').value = f.date;
-            document.getElementById('glider-select').value = f.glider;
-            document.getElementById('site-select').value = f.site;
-            document.getElementById('distance').value = f.dist;
-            document.getElementById('dur-h').value = Math.floor(f.dur / 60) || "";
-            document.getElementById('dur-m').value = f.dur % 60 || "";
-            document.getElementById('edit-indicator').style.display = 'block';
-            document.getElementById('form-title').innerText = "Edit Flight";
-            document.getElementById('save-btn').innerText = "Update Flight";
-            document.getElementById('cancel-edit-btn').style.display = 'block';
-            window.scrollTo(0, 0);
+
+            setTimeout(() => {
+                // Ensure date is in YYYY-MM-DD for the HTML input
+                document.getElementById('flight-date').value = formatToISO(f.date);
+                document.getElementById('glider-select').value = f.glider;
+                document.getElementById('site-select').value = f.site;
+                document.getElementById('distance').value = f.dist;
+                document.getElementById('dur-h').value = Math.floor(f.dur / 60) || "";
+                document.getElementById('dur-m').value = f.dur % 60 || "";
+                document.getElementById('edit-indicator').style.display = 'block';
+                document.getElementById('form-title').innerText = "Edit Flight";
+                document.getElementById('save-btn').innerText = "Update Flight";
+                document.getElementById('cancel-edit-btn').style.display = 'block';
+                window.scrollTo(0, 0);
+            }, 50);
         }
 
         function cancelEdit() {
@@ -208,21 +226,26 @@
         }
 
         function saveFlight() {
-            const date = document.getElementById('flight-date').value;
+            const dateInput = document.getElementById('flight-date').value;
             const g = document.getElementById('glider-select').value;
             const s = document.getElementById('site-select').value;
-            if(!date || !g || !s) return alert("Required fields missing.");
+            if(!dateInput || !g || !s) return alert("Required fields missing.");
+            
             const flightData = {
-                date, glider: g, site: s,
+                date: formatToISO(dateInput), 
+                glider: g, 
+                site: s,
                 dist: document.getElementById('distance').value || 0,
                 dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
             };
+
             if (editingFlightIndex !== null) {
                 flights[editingFlightIndex] = flightData;
                 cancelEdit();
             } else {
                 flights.push(flightData);
             }
+            
             saveData(); refreshUI();
             alert(editingFlightIndex !== null ? "Flight updated!" : "Flight saved!");
         }
@@ -233,7 +256,7 @@
                 <div class="flight-card">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
                         <div>
-                            <strong>${f.date}</strong><br>
+                            <strong>${formatDateDisplay(f.date)}</strong><br>
                             ${f.site} — ${f.glider}<br>
                             <small>${f.dist} km | ${Math.floor(f.dur/60)}h ${f.dur%60}m</small>
                         </div>
@@ -262,7 +285,13 @@
                     if (c[iG] && !gliders.includes(c[iG])) gliders.push(c[iG]);
                     if (c[iS] && !sites.includes(c[iS])) sites.push(c[iS]);
                     let d = c[iDu] || "0", m = d.includes(":") ? (parseInt(d.split(":")[0])*60)+parseInt(d.split(":")[1]) : parseInt(d);
-                    flights.push({ date: c[iD], glider: c[iG], site: c[iS], dist: c[iDi] || 0, dur: m });
+                    flights.push({ 
+                        date: formatToISO(c[iD]), 
+                        glider: c[iG], 
+                        site: c[iS], 
+                        dist: c[iDi] || 0, 
+                        dur: m 
+                    });
                 }
                 gliders.sort(); sites.sort(); saveData(); refreshUI();
             };
