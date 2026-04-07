@@ -153,30 +153,20 @@
         }
 
         function editFlight(originalFlight) {
-            // Find flight index
             editingFlightIndex = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
             if (editingFlightIndex === -1) return;
-
             const f = flights[editingFlightIndex];
-            
-            // Switch to Main page first so UI elements are available
             showPage('log-page');
-
-            // Populate Main Form with existing data
             document.getElementById('flight-date').value = f.date;
             document.getElementById('glider-select').value = f.glider;
             document.getElementById('site-select').value = f.site;
             document.getElementById('distance').value = f.dist;
             document.getElementById('dur-h').value = Math.floor(f.dur / 60) || "";
             document.getElementById('dur-m').value = f.dur % 60 || "";
-
-            // UI feedback for Edit mode
             document.getElementById('edit-indicator').style.display = 'block';
             document.getElementById('form-title').innerText = "Edit Flight";
             document.getElementById('save-btn').innerText = "Update Flight";
             document.getElementById('cancel-edit-btn').style.display = 'block';
-            
-            // Scroll to top to ensure user sees the form
             window.scrollTo(0, 0);
         }
 
@@ -186,8 +176,6 @@
             document.getElementById('form-title').innerText = "Log New Flight";
             document.getElementById('save-btn').innerText = "Save Flight";
             document.getElementById('cancel-edit-btn').style.display = 'none';
-            
-            // Reset form to defaults
             document.getElementById('flight-date').valueAsDate = new Date();
             document.getElementById('distance').value = "";
             document.getElementById('dur-h').value = "";
@@ -224,20 +212,17 @@
             const g = document.getElementById('glider-select').value;
             const s = document.getElementById('site-select').value;
             if(!date || !g || !s) return alert("Required fields missing.");
-            
             const flightData = {
                 date, glider: g, site: s,
                 dist: document.getElementById('distance').value || 0,
                 dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
             };
-
             if (editingFlightIndex !== null) {
                 flights[editingFlightIndex] = flightData;
                 cancelEdit();
             } else {
                 flights.push(flightData);
             }
-            
             saveData(); refreshUI();
             alert(editingFlightIndex !== null ? "Flight updated!" : "Flight saved!");
         }
@@ -291,11 +276,8 @@
             document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
-            
             document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span class="clickable-glider" onclick="viewGliderDetail('${g}')">${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
-            
             document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item"><span class="clickable-site" onclick="viewSiteDetail('${s}')">${s}</span><div class="btn-group"><button class="edit-btn" onclick="editSite(${i})">Rename</button><button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div></div>`).join('');
-            
             const gS = {}; flights.forEach(f => { if(!gS[f.glider]) gS[f.glider] = {c:0, t:0}; gS[f.glider].c++; gS[f.glider].t += f.dur; });
             document.getElementById('glider-stats-list').innerHTML = Object.entries(gS).map(([n, d]) => `<div class="list-item"><span class="clickable-glider" onclick="viewGliderDetail('${n}')">${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
         }
