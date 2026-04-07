@@ -3,69 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParaLog</title>
+    <title>ParaLog - Flight Logbook</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <style>
+        body { padding-bottom: 50px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+        .glider-row { display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding: 5px 0; }
+        input, select { width: 100%; margin-bottom: 10px; }
+        .legacy-section { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-top: 30px; border: 1px dashed #555; }
+        h2 { margin-top: 0; }
+    </style>
 </head>
 <body>
+
     <h1>🪂 ParaLog</h1>
-    
+
     <section id="dashboard">
-        <h3>Stats</h3>
-        <p>Total Flights: <span id="stat-total">0</span></p>
-        <p>Total Hours: <span id="stat-hours">0</span></p>
-    </section>
-
-    <section id="add-flight">
-        <h3>Log New Flight</h3>
-        <select id="glider-select" required></select>
-        <input type="text" id="takeoff" placeholder="Take-off Location" required>
-        <input type="number" id="dist" placeholder="Distance (km)">
-        <div style="display:flex; gap:10px;">
-            <input type="number" id="dur-h" placeholder="Hours">
-            <input type="number" id="dur-m" placeholder="Minutes">
+        <div class="stats-grid">
+            <div class="card">
+                <small>Total Flights</small>
+                <h2 id="stat-total-flights">0</h2>
+            </div>
+            <div class="card">
+                <small>Total Duration</small>
+                <h2 id="stat-total-time">0h 0m</h2>
+            </div>
         </div>
-        <button onclick="saveFlight()">Save Flight</button>
+
+        <h3>Stats per Glider</h3>
+        <div id="glider-stats-container">
+            <p>No flights logged yet.</p>
+        </div>
     </section>
 
-    <section id="settings">
-        <h3>Settings & Data</h3>
-        <button onclick="exportCSV()">Export to CSV</button>
-        <input type="file" id="importFile" onchange="importCSV()" style="display:none">
-        <button onclick="document.getElementById('importFile').click()">Import CSV</button>
+    <hr>
+
+    <section id="log-flight">
+        <h3>Log New Flight</h3>
+        <label>Glider</label>
+        <select id="glider-select">
+            <option value="Ozone Mojo">Ozone Mojo</option>
+            <option value="Niviuk Hook">Niviuk Hook</option>
+            <option value="Advance Alpha">Advance Alpha</option>
+        </select>
+
+        <label>Take-off</label>
+        <input type="text" id="takeoff" placeholder="e.g. Grand Bornand">
+
+        <label>Distance (km)</label>
+        <input type="number" id="distance" placeholder="0">
+
+        <label>Duration</label>
+        <div style="display: flex; gap: 10px;">
+            <input type="number" id="dur-h" placeholder="Hrs">
+            <input type="number" id="dur-m" placeholder="Min">
+        </div>
+
+        <button onclick="saveFlight()" style="width: 100%; background-color: #007bff; color: white;">Save Flight</button>
+    </section>
+
+    <section class="legacy-section">
+        <h3>⚙️ Settings & Legacy Data</h3>
+        <p><small>Input numbers here to add them to your total count (e.g., your old paper logbook totals).</small></p>
+        
+        <label>Legacy Flight Count:</label>
+        <input type="number" id="legacy-count-input" placeholder="e.g. 510" oninput="saveSettings()">
+
+        <label>Legacy Hours Offset:</label>
+        <input type="number" id="legacy-hours-input" placeholder="e.g. 120" oninput="saveSettings()">
+        
+        <button onclick="exportCSV()" style="width: 100%; margin-top: 10px;">Export to CSV</button>
     </section>
 
     <script>
-        // Use LocalStorage to persist data
+        // 1. Data Initialization
         let flights = JSON.parse(localStorage.getItem('flights')) || [];
-        let legacyCount = parseInt(localStorage.getItem('legacyCount')) || 0;
 
+        // 2. Load settings on start
+        window.onload = () => {
+            document.getElementById('legacy-count-input').value = localStorage.getItem('legacyCount') || 0;
+            document.getElementById('legacy-hours-input').value = localStorage.getItem('legacyHours') || 0;
+            renderDashboard();
+        };
+
+        // 3. Save Legacy Settings
+        function saveSettings() {
+            const count = document.getElementById('legacy-count-input').value;
+            const hours = document.getElementById('legacy-hours-input').value;
+            
+            localStorage.setItem('legacyCount', count || 0);
+            localStorage.setItem('legacyHours', hours || 0);
+            
+            renderDashboard();
+        }
+
+        // 4. Save New Flight
         function saveFlight() {
-            const flight = {
-                glider: document.getElementById('glider-select').value,
-                takeoff: document.getElementById('takeoff').value,
-                distance: document.getElementById('dist').value,
-                duration: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + 
-                          (parseInt(document.getElementById('dur-m').value) || 0)
+            const glider = document.getElementById('glider-select').value;
+            const takeoff = document.getElementById('takeoff').value;
+            const dist = document.getElementById('distance').value;
+            const h = parseInt(document.getElementById('dur-h').value) || 0;
+            const m = parseInt(document.getElementById('dur-m').value) || 0;
+
+            if (!takeoff) { alert("Please enter a take-off location"); return; }
+
+            const newFlight = {
+                glider: glider,
+                takeoff: takeoff,
+                distance: dist || 0,
+                durationMinutes: (h * 60) + m,
+                date: new Date().toLocaleDateString()
             };
-            flights.push(flight);
+
+            flights.push(newFlight);
             localStorage.setItem('flights', JSON.stringify(flights));
-            updateDashboard();
+            
+            // Clear inputs
+            document.getElementById('takeoff').value = "";
+            document.getElementById('distance').value = "";
+            document.getElementById('dur-h').value = "";
+            document.getElementById('dur-m').value = "";
+
+            renderDashboard();
         }
 
-        function updateDashboard() {
-            document.getElementById('stat-total').innerText = flights.length + legacyCount;
-            // Additional logic for stats per glider here
+        // 5. Render Dashboard
+        function renderDashboard() {
+            const offsetFlights = parseInt(localStorage.getItem('legacyCount')) || 0;
+            const offsetHours = parseInt(localStorage.getItem('legacyHours')) || 0;
+
+            const appFlightCount = flights.length;
+            const appTotalMinutes = flights.reduce((sum, f) => sum + (parseInt(f.durationMinutes) || 0), 0);
+
+            const grandTotalFlights = appFlightCount + offsetFlights;
+            const grandTotalMinutes = appTotalMinutes + (offsetHours * 60);
+
+            // Update UI Totals
+            document.getElementById('stat-total-flights').innerText = grandTotalFlights;
+            document.getElementById('stat-total-time').innerText = 
+                `${Math.floor(grandTotalMinutes / 60)}h ${grandTotalMinutes % 60}m`;
+
+            // Calculate Per-Glider Stats (Logged flights only)
+            renderGliderStats();
         }
 
+        function renderGliderStats() {
+            if (flights.length === 0) return;
+
+            const stats = {};
+            flights.forEach(f => {
+                if (!stats[f.glider]) stats[f.glider] = { count: 0, time: 0 };
+                stats[f.glider].count++;
+                stats[f.glider].time += f.durationMinutes;
+            });
+
+            let html = "";
+            for (const [name, data] of Object.entries(stats)) {
+                html += `
+                <div class="glider-row">
+                    <span><strong>${name}</strong></span>
+                    <span>${data.count} fl / ${Math.floor(data.time/60)}h ${data.time%60}m</span>
+                </div>`;
+            }
+            document.getElementById('glider-stats-container').innerHTML = html;
+        }
+
+        // 6. Export CSV
         function exportCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Glider,Takeoff,Distance,DurationMinutes\n" 
-                + flights.map(e => `${e.glider},${e.takeoff},${e.distance},${e.duration}`).join("\n");
-            window.open(encodeURI(csvContent));
+            if (flights.length === 0) { alert("No flights to export!"); return; }
+            
+            let csv = "Date,Glider,Takeoff,DistanceKM,DurationMin\n";
+            flights.forEach(f => {
+                csv += `${f.date},${f.glider},${f.takeoff},${f.distance},${f.durationMinutes}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'paragliding_logbook.csv');
+            a.click();
         }
-        
-        updateDashboard();
     </script>
 </body>
 </html>
