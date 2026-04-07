@@ -16,7 +16,7 @@
         .stats-summary h2 { margin: 0; color: #007bff; }
         .list-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 4px; }
         .delete-btn { background: #ff4444; color: white; padding: 2px 8px; border: none; border-radius: 4px; }
-        .input-group { margin-bottom: 15px; }
+        .import-area { border: 2px dashed #444; padding: 10px; margin-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -31,37 +31,20 @@
 
     <div id="log-page" class="page active-page">
         <div class="stats-summary">
-            <div>
-                <small>Total Flights</small>
-                <h2 id="main-total-flights">0</h2>
-            </div>
-            <div>
-                <small>Total Airtime</small>
-                <h2 id="main-total-time">0h 0m</h2>
-            </div>
+            <div><small>Total Flights</small><h2 id="main-total-flights">0</h2></div>
+            <div><small>Total Airtime</small><h2 id="main-total-time">0h 0m</h2></div>
         </div>
-
         <h3>Log New Flight</h3>
-        <div class="input-group">
-            <label>Date</label>
-            <input type="date" id="flight-date">
-            
-            <label>Glider *</label>
-            <select id="glider-select"></select>
-            
-            <label>Take-off Site *</label>
-            <select id="site-select"></select>
-
-            <label>Distance (km)</label>
-            <input type="number" id="distance" placeholder="Optional">
-
-            <label>Duration</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="number" id="dur-h" placeholder="Hrs">
-                <input type="number" id="dur-m" placeholder="Min">
-            </div>
-            <button onclick="saveFlight()" style="width:100%; background: #007bff; color:white; margin-top: 10px;">Save Flight</button>
+        <label>Date</label><input type="date" id="flight-date">
+        <label>Glider *</label><select id="glider-select"></select>
+        <label>Take-off Site *</label><select id="site-select"></select>
+        <label>Distance (km)</label><input type="number" id="distance" placeholder="Optional">
+        <label>Duration</label>
+        <div style="display: flex; gap: 10px;">
+            <input type="number" id="dur-h" placeholder="Hrs">
+            <input type="number" id="dur-m" placeholder="Min">
         </div>
+        <button onclick="saveFlight()" style="width:100%; background: #007bff; color:white; margin-top: 10px;">Save Flight</button>
     </div>
 
     <div id="stats-page" class="page">
@@ -73,26 +56,28 @@
         <h2>Manage Wings</h2>
         <input type="text" id="new-glider" placeholder="Wing Name">
         <button onclick="addItem('gliders', 'new-glider')">Add Wing</button>
-        <hr>
         <div id="glider-list"></div>
     </div>
-
     <div id="sites-page" class="page">
         <h2>Manage Sites</h2>
         <input type="text" id="new-site" placeholder="Site Name">
         <button onclick="addItem('sites', 'new-site')">Add Site</button>
-        <hr>
         <div id="site-list"></div>
     </div>
 
     <div id="settings-page" class="page">
         <h2>Legacy & Data</h2>
-        <label>Legacy Flight Count</label>
+        <label>Legacy Flight Count Offset</label>
         <input type="number" id="legacy-count-input" value="0" oninput="updateLegacy()">
-        
         <label>Legacy Hours Offset</label>
         <input type="number" id="legacy-hours-input" value="0" oninput="updateLegacy()">
-        
+        <hr>
+        <h3>Import History</h3>
+        <p><small>Upload a CSV with headers: Date, T/O Site, Distance (km), Duration, Glider</small></p>
+        <div class="import-area">
+            <input type="file" id="csv-file" accept=".csv">
+            <button onclick="importCSV()" style="margin-top:10px;">Process CSV</button>
+        </div>
         <hr>
         <button onclick="exportCSV()" style="width:100%">Export CSV</button>
         <button onclick="clearAllData()" style="width:100%; background:#444; margin-top:10px;">Delete All Data</button>
@@ -109,48 +94,90 @@
             refreshUI();
         }
 
-        function addItem(type, inputId) {
-            const val = document.getElementById(inputId).value.trim();
-            if(!val) return;
-            if(type === 'gliders') gliders.push(val);
-            else sites.push(val);
+        // Logic for Dynamic Lists
+        function addItem(type, inputId, silent = false) {
+            const val = document.getElementById(inputId) ? document.getElementById(inputId).value.trim() : inputId;
+            if(!val || (type === 'gliders' ? gliders : sites).includes(val)) return;
+            if(type === 'gliders') gliders.push(val); else sites.push(val);
             saveData();
-            document.getElementById(inputId).value = "";
-            refreshUI();
+            if(!silent) { if(document.getElementById(inputId)) document.getElementById(inputId).value = ""; refreshUI(); }
         }
 
         function deleteItem(type, index) {
-            if(type === 'gliders') gliders.splice(index, 1);
-            else sites.splice(index, 1);
-            saveData();
-            refreshUI();
+            if(type === 'gliders') gliders.splice(index, 1); else sites.splice(index, 1);
+            saveData(); refreshUI();
         }
 
         function saveFlight() {
             const date = document.getElementById('flight-date').value;
             const g = document.getElementById('glider-select').value;
             const s = document.getElementById('site-select').value;
+            if(!date || !g || !s) return alert("Missing required fields.");
             
-            if(!date || !g || !s) return alert("Date, Glider, and Site are required.");
-
-            const f = {
-                date: date,
-                glider: g,
-                site: s,
+            flights.push({
+                date, glider: g, site: s,
                 dist: document.getElementById('distance').value || 0,
                 dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
-            };
-            
-            flights.push(f);
+            });
             saveData();
-            
-            // Reset form
-            document.getElementById('distance').value = "";
-            document.getElementById('dur-h').value = "";
-            document.getElementById('dur-m').value = "";
-            
             alert("Flight saved!");
             refreshUI();
+        }
+
+        // --- NEW IMPORT LOGIC ---
+        function importCSV() {
+            const fileInput = document.getElementById('csv-file');
+            if (!fileInput.files.length) return alert("Select a file first.");
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim() !== "");
+                const headers = rows[0].split(',').map(h => h.trim().replace(/^#/, ""));
+
+                // Find column indexes based on your specific header row
+                const idxDate = headers.indexOf("Date");
+                const idxSite = headers.indexOf("T/O Site");
+                const idxDist = headers.indexOf("Distance (km)");
+                const idxDur = headers.indexOf("Duration");
+                const idxGlider = headers.indexOf("Glider");
+
+                if (idxDate === -1 || idxGlider === -1) return alert("Required headers not found in CSV.");
+
+                for (let i = 1; i < rows.length; i++) {
+                    const cols = rows[i].split(',').map(c => c.trim());
+                    if (cols.length < headers.length) continue;
+
+                    // 1. Add Glider/Site to master lists if they are new
+                    const gName = cols[idxGlider];
+                    const sName = cols[idxSite];
+                    if (gName && !gliders.includes(gName)) gliders.push(gName);
+                    if (sName && !sites.includes(sName)) sites.push(sName);
+
+                    // 2. Format Duration (Assuming CSV is in "H:MM" or total minutes? 
+                    // Most logbooks use total minutes or HH:MM. Here we assume HH:MM or minutes.)
+                    let rawDur = cols[idxDur] || "0";
+                    let finalMinutes = 0;
+                    if(rawDur.includes(":")) {
+                        let parts = rawDur.split(":");
+                        finalMinutes = (parseInt(parts[0]) * 60) + parseInt(parts[1]);
+                    } else {
+                        finalMinutes = parseInt(rawDur);
+                    }
+
+                    flights.push({
+                        date: cols[idxDate],
+                        glider: gName,
+                        site: sName,
+                        dist: cols[idxDist] || 0,
+                        dur: finalMinutes
+                    });
+                }
+                saveData();
+                alert(`Imported ${rows.length - 1} flights!`);
+                refreshUI();
+            };
+            reader.readAsText(fileInput.files[0]);
         }
 
         function updateLegacy() {
@@ -160,21 +187,17 @@
         }
 
         function refreshUI() {
-            // Totals Math
             const offC = parseInt(localStorage.getItem('legacyCount')) || 0;
             const offH = parseInt(localStorage.getItem('legacyHours')) || 0;
             const totalF = flights.length + offC;
             const totalM = flights.reduce((sum, f) => sum + f.dur, 0) + (offH * 60);
 
-            // Update Main Page Stats
             document.getElementById('main-total-flights').innerText = totalF;
             document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
 
-            // Update Dropdowns
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
 
-            // Update Detailed Stats List
             const gStats = {};
             flights.forEach(f => {
                 if(!gStats[f.glider]) gStats[f.glider] = {c:0, t:0};
@@ -183,9 +206,8 @@
             });
             document.getElementById('glider-stats-list').innerHTML = Object.entries(gStats).map(([name, d]) => 
                 `<div class="list-item"><span>${name}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`
-            ).join('') || "No logged flight data.";
+            ).join('') || "No logged data.";
 
-            // Update Settings Lists
             document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item">${g} <button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
             document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item">${s} <button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div>`).join('');
         }
@@ -197,8 +219,8 @@
         }
 
         function exportCSV() {
-            let csv = "Date,Glider,Site,DistanceKM,DurationMin\n";
-            flights.forEach(f => csv += `${f.date},${f.glider},${f.site},${f.dist},${f.dur}\n`);
+            let csv = "Date,T/O Site,Distance (km),Duration,Glider\n";
+            flights.forEach(f => csv += `${f.date},${f.site},${f.dist},${f.dur},${f.glider}\n`);
             const blob = new Blob([csv], {type:'text/csv'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
