@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParaLog</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+</head>
+<body>
+    <h1>🪂 ParaLog</h1>
+    
+    <section id="dashboard">
+        <h3>Stats</h3>
+        <p>Total Flights: <span id="stat-total">0</span></p>
+        <p>Total Hours: <span id="stat-hours">0</span></p>
+    </section>
+
+    <section id="add-flight">
+        <h3>Log New Flight</h3>
+        <select id="glider-select" required></select>
+        <input type="text" id="takeoff" placeholder="Take-off Location" required>
+        <input type="number" id="dist" placeholder="Distance (km)">
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="dur-h" placeholder="Hours">
+            <input type="number" id="dur-m" placeholder="Minutes">
+        </div>
+        <button onclick="saveFlight()">Save Flight</button>
+    </section>
+
+    <section id="settings">
+        <h3>Settings & Data</h3>
+        <button onclick="exportCSV()">Export to CSV</button>
+        <input type="file" id="importFile" onchange="importCSV()" style="display:none">
+        <button onclick="document.getElementById('importFile').click()">Import CSV</button>
+    </section>
+
+    <script>
+        // Use LocalStorage to persist data
+        let flights = JSON.parse(localStorage.getItem('flights')) || [];
+        let legacyCount = parseInt(localStorage.getItem('legacyCount')) || 0;
+
+        function saveFlight() {
+            const flight = {
+                glider: document.getElementById('glider-select').value,
+                takeoff: document.getElementById('takeoff').value,
+                distance: document.getElementById('dist').value,
+                duration: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + 
+                          (parseInt(document.getElementById('dur-m').value) || 0)
+            };
+            flights.push(flight);
+            localStorage.setItem('flights', JSON.stringify(flights));
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            document.getElementById('stat-total').innerText = flights.length + legacyCount;
+            // Additional logic for stats per glider here
+        }
+
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Glider,Takeoff,Distance,DurationMinutes\n" 
+                + flights.map(e => `${e.glider},${e.takeoff},${e.distance},${e.duration}`).join("\n");
+            window.open(encodeURI(csvContent));
+        }
+        
+        updateDashboard();
+    </script>
+</body>
+</html>
