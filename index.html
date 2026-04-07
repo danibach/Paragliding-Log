@@ -25,7 +25,7 @@
         .delete-btn { background: #ff4444; color: white; padding: 2px 8px; border: none; border-radius: 4px; font-size: 0.7rem; }
         .edit-btn { background: #ffc107; color: black; padding: 2px 8px; border: none; border-radius: 4px; font-size: 0.7rem; }
         .flight-card { border-left: 4px solid #007bff; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.9rem; position: relative; }
-        .clickable-site { color: #007bff; text-decoration: underline; cursor: pointer; }
+        .clickable-site, .clickable-glider { color: #007bff; text-decoration: underline; cursor: pointer; }
         .import-area { border: 2px dashed #444; padding: 15px; margin-top: 10px; text-align: center; border-radius: 8px; }
     </style>
 </head>
@@ -66,6 +66,12 @@
         <button onclick="showPage('sites-page')" style="margin-bottom:10px;">← Back to Sites</button>
         <h2 id="detail-site-name">Site Name</h2>
         <div id="site-specific-history"></div>
+    </div>
+
+    <div id="glider-detail-page" class="page">
+        <button onclick="showPage('stats-page')" style="margin-bottom:10px;">← Back to Stats</button>
+        <h2 id="detail-glider-name">Glider Name</h2>
+        <div id="glider-specific-history"></div>
     </div>
 
     <div id="stats-page" class="page">
@@ -149,6 +155,12 @@
             const newDate = prompt("Date (YYYY-MM-DD):", flights[index].date);
             if (!newDate) return;
 
+            const newGlider = prompt("Glider Name:", flights[index].glider);
+            if (!newGlider) return;
+
+            const newSite = prompt("Take-off Site:", flights[index].site);
+            if (!newSite) return;
+
             const newDist = prompt("Distance (km) - optional:", flights[index].dist);
             const rawDur = prompt("Duration (Minutes or H:MM) - optional:", `${Math.floor(flights[index].dur/60)}h ${flights[index].dur%60}m`);
 
@@ -160,13 +172,20 @@
                 finalMins = parseInt(rawDur) || 0;
             }
 
+            // Ensure new glider/site exists in dropdowns
+            if (!gliders.includes(newGlider)) { gliders.push(newGlider); gliders.sort(); }
+            if (!sites.includes(newSite)) { sites.push(newSite); sites.sort(); }
+
             flights[index].date = newDate;
+            flights[index].glider = newGlider;
+            flights[index].site = newSite;
             flights[index].dist = newDist || 0;
             flights[index].dur = finalMins;
 
             saveData();
             const currentPage = document.querySelector('.active-page').id;
             if(currentPage === 'site-detail-page') viewSiteDetail(document.getElementById('detail-site-name').innerText);
+            else if(currentPage === 'glider-detail-page') viewGliderDetail(document.getElementById('detail-glider-name').innerText);
             else renderHistory('flight-history-list', flights);
             refreshUI();
         }
@@ -178,12 +197,20 @@
             showPage('site-detail-page');
         }
 
+        function viewGliderDetail(gliderName) {
+            document.getElementById('detail-glider-name').innerText = gliderName;
+            const filtered = flights.filter(f => f.glider === gliderName);
+            renderHistory('glider-specific-history', filtered);
+            showPage('glider-detail-page');
+        }
+
         function deleteFlight(flightToMatch) {
             if(!confirm("Delete permanently?")) return;
             flights = flights.filter(f => JSON.stringify(f) !== JSON.stringify(flightToMatch));
             saveData();
             const currentPage = document.querySelector('.active-page').id;
             if(currentPage === 'site-detail-page') viewSiteDetail(document.getElementById('detail-site-name').innerText);
+            else if(currentPage === 'glider-detail-page') viewGliderDetail(document.getElementById('detail-glider-name').innerText);
             else renderHistory('flight-history-list', flights);
             refreshUI();
         }
@@ -250,10 +277,13 @@
             document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
-            document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span>${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
+            
+            document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span class="clickable-glider" onclick="viewGliderDetail('${g}')">${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
+            
             document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item"><span class="clickable-site" onclick="viewSiteDetail('${s}')">${s}</span><div class="btn-group"><button class="edit-btn" onclick="editSite(${i})">Rename</button><button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div></div>`).join('');
+            
             const gS = {}; flights.forEach(f => { if(!gS[f.glider]) gS[f.glider] = {c:0, t:0}; gS[f.glider].c++; gS[f.glider].t += f.dur; });
-            document.getElementById('glider-stats-list').innerHTML = Object.entries(gS).map(([n, d]) => `<div class="list-item"><span>${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
+            document.getElementById('glider-stats-list').innerHTML = Object.entries(gS).map(([n, d]) => `<div class="list-item"><span class="clickable-glider" onclick="viewGliderDetail('${n}')">${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
         }
 
         function saveData() {
