@@ -85,15 +85,12 @@
         <h2>Settings & Import</h2>
         <label>Legacy Flight Count Offset</label><input type="number" id="legacy-count-input" value="0" oninput="updateLegacy()">
         <label>Legacy Hours Offset</label><input type="number" id="legacy-hours-input" value="0" oninput="updateLegacy()">
-        
         <hr>
         <h3>Import Data</h3>
-        <p><small>Headers: Date, T/O Site, Distance (km), Duration, Glider</small></p>
         <div class="import-area">
             <input type="file" id="csv-file" accept=".csv">
             <button onclick="importCSV()" style="margin-top:10px; width: 100%;">Process CSV</button>
         </div>
-        
         <hr>
         <button onclick="exportCSV()" style="width:100%">Export CSV</button>
         <button onclick="clearAllData()" style="width:100%; background:#444; margin-top:10px;">Delete All Data</button>
@@ -123,7 +120,7 @@
         }
 
         function deleteItem(type, index) {
-            if(!confirm("Remove from dropdown list? Existing flights won't be deleted.")) return;
+            if(!confirm("Remove from dropdown? Existing flights won't change.")) return;
             if(type === 'gliders') gliders.splice(index, 1); else sites.splice(index, 1);
             saveData(); refreshUI();
         }
@@ -135,9 +132,37 @@
                 sites[index] = newName;
                 sites.sort();
                 flights.forEach(f => { if(f.site === oldName) f.site = newName; });
-                saveData();
-                refreshUI();
+                saveData(); refreshUI();
             }
+        }
+
+        function editFlight(originalFlight) {
+            const index = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
+            if (index === -1) return;
+
+            const newDate = prompt("Date (YYYY-MM-DD):", flights[index].date);
+            if (!newDate) return;
+
+            const newDist = prompt("Distance (km) - optional:", flights[index].dist);
+            const rawDur = prompt("Duration (Minutes or H:MM) - optional:", `${Math.floor(flights[index].dur/60)}h ${flights[index].dur%60}m`);
+
+            let finalMins = 0;
+            if (rawDur && rawDur.includes(":")) {
+                let p = rawDur.replace(/[h m]/g, "").split(":");
+                finalMins = (parseInt(p[0]) * 60) + (parseInt(p[1]) || 0);
+            } else {
+                finalMins = parseInt(rawDur) || 0;
+            }
+
+            flights[index].date = newDate;
+            flights[index].dist = newDist || 0;
+            flights[index].dur = finalMins;
+
+            saveData();
+            const currentPage = document.querySelector('.active-page').id;
+            if(currentPage === 'site-detail-page') viewSiteDetail(document.getElementById('detail-site-name').innerText);
+            else renderHistory('flight-history-list', flights);
+            refreshUI();
         }
 
         function viewSiteDetail(siteName) {
@@ -148,15 +173,12 @@
         }
 
         function deleteFlight(flightToMatch) {
-            if(!confirm("Delete this flight permanently?")) return;
-            flights = flights.filter(f => !(f.date === flightToMatch.date && f.site === flightToMatch.site && f.dur === flightToMatch.dur && f.glider === flightToMatch.glider));
+            if(!confirm("Delete permanently?")) return;
+            flights = flights.filter(f => JSON.stringify(f) !== JSON.stringify(flightToMatch));
             saveData();
             const currentPage = document.querySelector('.active-page').id;
-            if(currentPage === 'site-detail-page') {
-                viewSiteDetail(document.getElementById('detail-site-name').innerText);
-            } else {
-                renderHistory('flight-history-list', flights);
-            }
+            if(currentPage === 'site-detail-page') viewSiteDetail(document.getElementById('detail-site-name').innerText);
+            else renderHistory('flight-history-list', flights);
             refreshUI();
         }
 
@@ -164,16 +186,13 @@
             const date = document.getElementById('flight-date').value;
             const g = document.getElementById('glider-select').value;
             const s = document.getElementById('site-select').value;
-            if(!date || !g || !s) return alert("Missing required fields.");
-            
+            if(!date || !g || !s) return alert("Required fields missing.");
             flights.push({
                 date, glider: g, site: s,
                 dist: document.getElementById('distance').value || 0,
                 dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
             });
-            saveData();
-            alert("Flight saved!");
-            refreshUI();
+            saveData(); refreshUI();
         }
 
         function renderHistory(elementId, dataArray) {
@@ -186,10 +205,13 @@
                             ${f.site} — ${f.glider}<br>
                             <small>${f.dist} km | ${Math.floor(f.dur/60)}h ${f.dur%60}m</small>
                         </div>
-                        <button class="delete-btn" onclick='deleteFlight(${JSON.stringify(f)})'>Delete</button>
+                        <div class="btn-group">
+                            <button class="edit-btn" onclick='editFlight(${JSON.stringify(f)})'>Edit</button>
+                            <button class="delete-btn" onclick='deleteFlight(${JSON.stringify(f)})'>Delete</button>
+                        </div>
                     </div>
                 </div>
-            `).join('') || "No flights recorded.";
+            `).join('') || "No flights.";
         }
 
         function importCSV() {
@@ -200,53 +222,32 @@
                 const text = e.target.result;
                 const rows = text.split('\n').filter(r => r.trim() !== "");
                 const headers = rows[0].split(',').map(h => h.trim().replace(/^#/, ""));
-
-                const idxDate = headers.indexOf("Date"), idxSite = headers.indexOf("T/O Site");
-                const idxDist = headers.indexOf("Distance (km)"), idxDur = headers.indexOf("Duration");
-                const idxGlider = headers.indexOf("Glider");
-
-                if (idxDate === -1 || idxSite === -1 || idxGlider === -1) return alert("Headers don't match. Ensure CSV has: Date, T/O Site, Distance (km), Duration, Glider");
-
+                const iD = headers.indexOf("Date"), iS = headers.indexOf("T/O Site"), iDi = headers.indexOf("Distance (km)"), iDu = headers.indexOf("Duration"), iG = headers.indexOf("Glider");
+                if (iD === -1 || iS === -1 || iG === -1) return alert("Headers mismatch.");
                 for (let i = 1; i < rows.length; i++) {
-                    const cols = rows[i].split(',').map(c => c.trim());
-                    if (cols.length < headers.length) continue;
-                    
-                    const gName = cols[idxGlider], sName = cols[idxSite];
-                    if (gName && !gliders.includes(gName)) gliders.push(gName);
-                    if (sName && !sites.includes(sName)) sites.push(sName);
-
-                    let rawDur = cols[idxDur] || "0";
-                    let mins = rawDur.includes(":") ? (parseInt(rawDur.split(":")[0])*60)+parseInt(rawDur.split(":")[1]) : parseInt(rawDur);
-
-                    flights.push({ date: cols[idxDate], glider: gName, site: sName, dist: cols[idxDist] || 0, dur: mins });
+                    const c = rows[i].split(',').map(v => v.trim());
+                    if (c.length < headers.length) continue;
+                    if (c[iG] && !gliders.includes(c[iG])) gliders.push(c[iG]);
+                    if (c[iS] && !sites.includes(c[iS])) sites.push(c[iS]);
+                    let d = c[iDu] || "0", m = d.includes(":") ? (parseInt(d.split(":")[0])*60)+parseInt(d.split(":")[1]) : parseInt(d);
+                    flights.push({ date: c[iD], glider: c[iG], site: c[iS], dist: c[iDi] || 0, dur: m });
                 }
                 gliders.sort(); sites.sort(); saveData(); refreshUI();
-                alert("Import successful!");
             };
             reader.readAsText(fileInput.files[0]);
         }
 
         function refreshUI() {
-            const offC = parseInt(localStorage.getItem('legacyCount')) || 0;
-            const offH = parseInt(localStorage.getItem('legacyHours')) || 0;
-            const totalF = flights.length + offC;
-            const totalM = flights.reduce((s, f) => s + f.dur, 0) + (offH * 60);
-
+            const offC = parseInt(localStorage.getItem('legacyCount')) || 0, offH = parseInt(localStorage.getItem('legacyHours')) || 0;
+            const totalF = flights.length + offC, totalM = flights.reduce((s, f) => s + f.dur, 0) + (offH * 60);
             document.getElementById('main-total-flights').innerText = totalF;
             document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
-
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
-
             document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span>${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
             document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item"><span class="clickable-site" onclick="viewSiteDetail('${s}')">${s}</span><div class="btn-group"><button class="edit-btn" onclick="editSite(${i})">Rename</button><button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div></div>`).join('');
-
-            const gStats = {};
-            flights.forEach(f => {
-                if(!gStats[f.glider]) gStats[f.glider] = {c:0, t:0};
-                gStats[f.glider].c++; gStats[f.glider].t += f.dur;
-            });
-            document.getElementById('glider-stats-list').innerHTML = Object.entries(gStats).map(([n, d]) => `<div class="list-item"><span>${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
+            const gS = {}; flights.forEach(f => { if(!gS[f.glider]) gS[f.glider] = {c:0, t:0}; gS[f.glider].c++; gS[f.glider].t += f.dur; });
+            document.getElementById('glider-stats-list').innerHTML = Object.entries(gS).map(([n, d]) => `<div class="list-item"><span>${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
         }
 
         function saveData() {
@@ -261,7 +262,7 @@
             refreshUI();
         }
 
-        function clearAllData() { if(confirm("Delete EVERYTHING?")) { localStorage.clear(); location.reload(); } }
+        function clearAllData() { if(confirm("Delete all?")) { localStorage.clear(); location.reload(); } }
 
         function exportCSV() {
             let csv = "Date,T/O Site,Distance (km),Duration,Glider\n";
