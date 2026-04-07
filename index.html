@@ -153,23 +153,31 @@
         }
 
         function editFlight(originalFlight) {
+            // Find flight index
             editingFlightIndex = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
             if (editingFlightIndex === -1) return;
 
             const f = flights[editingFlightIndex];
+            
+            // Switch to Main page first so UI elements are available
+            showPage('log-page');
+
+            // Populate Main Form with existing data
             document.getElementById('flight-date').value = f.date;
             document.getElementById('glider-select').value = f.glider;
             document.getElementById('site-select').value = f.site;
             document.getElementById('distance').value = f.dist;
-            document.getElementById('dur-h').value = Math.floor(f.dur / 60);
-            document.getElementById('dur-m').value = f.dur % 60;
+            document.getElementById('dur-h').value = Math.floor(f.dur / 60) || "";
+            document.getElementById('dur-m').value = f.dur % 60 || "";
 
+            // UI feedback for Edit mode
             document.getElementById('edit-indicator').style.display = 'block';
             document.getElementById('form-title').innerText = "Edit Flight";
             document.getElementById('save-btn').innerText = "Update Flight";
             document.getElementById('cancel-edit-btn').style.display = 'block';
-
-            showPage('log-page');
+            
+            // Scroll to top to ensure user sees the form
+            window.scrollTo(0, 0);
         }
 
         function cancelEdit() {
@@ -178,6 +186,8 @@
             document.getElementById('form-title').innerText = "Log New Flight";
             document.getElementById('save-btn').innerText = "Save Flight";
             document.getElementById('cancel-edit-btn').style.display = 'none';
+            
+            // Reset form to defaults
             document.getElementById('flight-date').valueAsDate = new Date();
             document.getElementById('distance').value = "";
             document.getElementById('dur-h').value = "";
@@ -223,14 +233,13 @@
 
             if (editingFlightIndex !== null) {
                 flights[editingFlightIndex] = flightData;
-                alert("Flight updated!");
                 cancelEdit();
             } else {
                 flights.push(flightData);
-                alert("Flight saved!");
             }
             
             saveData(); refreshUI();
+            alert(editingFlightIndex !== null ? "Flight updated!" : "Flight saved!");
         }
 
         function renderHistory(elementId, dataArray) {
