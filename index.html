@@ -18,8 +18,9 @@
         .btn-group { display: flex; gap: 5px; }
         .delete-btn { background: #ff4444; color: white; padding: 2px 8px; border: none; border-radius: 4px; font-size: 0.7rem; }
         .edit-btn { background: #ffc107; color: black; padding: 2px 8px; border: none; border-radius: 4px; font-size: 0.7rem; }
-        .flight-card { border-left: 4px solid #007bff; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.9rem; }
+        .flight-card { border-left: 4px solid #007bff; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.9rem; position: relative; }
         .clickable-site { color: #007bff; text-decoration: underline; cursor: pointer; }
+        .import-area { border: 2px dashed #444; padding: 15px; margin-top: 10px; text-align: center; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -84,6 +85,15 @@
         <h2>Settings & Import</h2>
         <label>Legacy Flight Count Offset</label><input type="number" id="legacy-count-input" value="0" oninput="updateLegacy()">
         <label>Legacy Hours Offset</label><input type="number" id="legacy-hours-input" value="0" oninput="updateLegacy()">
+        
+        <hr>
+        <h3>Import Data</h3>
+        <p><small>Headers: Date, T/O Site, Distance (km), Duration, Glider</small></p>
+        <div class="import-area">
+            <input type="file" id="csv-file" accept=".csv">
+            <button onclick="importCSV()" style="margin-top:10px; width: 100%;">Process CSV</button>
+        </div>
+        
         <hr>
         <button onclick="exportCSV()" style="width:100%">Export CSV</button>
         <button onclick="clearAllData()" style="width:100%; background:#444; margin-top:10px;">Delete All Data</button>
@@ -101,7 +111,6 @@
             if(pageId === 'history-page') renderHistory('flight-history-list', flights);
         }
 
-        // List Management
         function addItem(type, inputId) {
             const val = document.getElementById(inputId).value.trim();
             if(!val) return;
@@ -114,7 +123,7 @@
         }
 
         function deleteItem(type, index) {
-            if(!confirm("Are you sure? This doesn't delete the flights, just the option in the menu.")) return;
+            if(!confirm("Remove from dropdown list? Existing flights won't be deleted.")) return;
             if(type === 'gliders') gliders.splice(index, 1); else sites.splice(index, 1);
             saveData(); refreshUI();
         }
@@ -123,10 +132,8 @@
             const oldName = sites[index];
             const newName = prompt("Rename site:", oldName);
             if (newName && newName !== oldName) {
-                // Update the sites list
                 sites[index] = newName;
                 sites.sort();
-                // Update all flights that used this site
                 flights.forEach(f => { if(f.site === oldName) f.site = newName; });
                 saveData();
                 refreshUI();
@@ -140,7 +147,19 @@
             showPage('site-detail-page');
         }
 
-        // Flight Logic
+        function deleteFlight(flightToMatch) {
+            if(!confirm("Delete this flight permanently?")) return;
+            flights = flights.filter(f => !(f.date === flightToMatch.date && f.site === flightToMatch.site && f.dur === flightToMatch.dur && f.glider === flightToMatch.glider));
+            saveData();
+            const currentPage = document.querySelector('.active-page').id;
+            if(currentPage === 'site-detail-page') {
+                viewSiteDetail(document.getElementById('detail-site-name').innerText);
+            } else {
+                renderHistory('flight-history-list', flights);
+            }
+            refreshUI();
+        }
+
         function saveFlight() {
             const date = document.getElementById('flight-date').value;
             const g = document.getElementById('glider-select').value;
@@ -161,11 +180,50 @@
             const sorted = [...dataArray].sort((a, b) => new Date(b.date) - new Date(a.date));
             document.getElementById(elementId).innerHTML = sorted.map(f => `
                 <div class="flight-card">
-                    <strong>${f.date}</strong><br>
-                    ${f.site} — ${f.glider}<br>
-                    <small>${f.dist} km | ${Math.floor(f.dur/60)}h ${f.dur%60}m</small>
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div>
+                            <strong>${f.date}</strong><br>
+                            ${f.site} — ${f.glider}<br>
+                            <small>${f.dist} km | ${Math.floor(f.dur/60)}h ${f.dur%60}m</small>
+                        </div>
+                        <button class="delete-btn" onclick='deleteFlight(${JSON.stringify(f)})'>Delete</button>
+                    </div>
                 </div>
             `).join('') || "No flights recorded.";
+        }
+
+        function importCSV() {
+            const fileInput = document.getElementById('csv-file');
+            if (!fileInput.files.length) return alert("Select a file.");
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(r => r.trim() !== "");
+                const headers = rows[0].split(',').map(h => h.trim().replace(/^#/, ""));
+
+                const idxDate = headers.indexOf("Date"), idxSite = headers.indexOf("T/O Site");
+                const idxDist = headers.indexOf("Distance (km)"), idxDur = headers.indexOf("Duration");
+                const idxGlider = headers.indexOf("Glider");
+
+                if (idxDate === -1 || idxSite === -1 || idxGlider === -1) return alert("Headers don't match. Ensure CSV has: Date, T/O Site, Distance (km), Duration, Glider");
+
+                for (let i = 1; i < rows.length; i++) {
+                    const cols = rows[i].split(',').map(c => c.trim());
+                    if (cols.length < headers.length) continue;
+                    
+                    const gName = cols[idxGlider], sName = cols[idxSite];
+                    if (gName && !gliders.includes(gName)) gliders.push(gName);
+                    if (sName && !sites.includes(sName)) sites.push(sName);
+
+                    let rawDur = cols[idxDur] || "0";
+                    let mins = rawDur.includes(":") ? (parseInt(rawDur.split(":")[0])*60)+parseInt(rawDur.split(":")[1]) : parseInt(rawDur);
+
+                    flights.push({ date: cols[idxDate], glider: gName, site: sName, dist: cols[idxDist] || 0, dur: mins });
+                }
+                gliders.sort(); sites.sort(); saveData(); refreshUI();
+                alert("Import successful!");
+            };
+            reader.readAsText(fileInput.files[0]);
         }
 
         function refreshUI() {
@@ -180,29 +238,15 @@
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
 
-            // Wings List
-            document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `
-                <div class="list-item"><span>${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
+            document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span>${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
+            document.getElementById('site-list').innerHTML = sites.map((s, i) => `<div class="list-item"><span class="clickable-site" onclick="viewSiteDetail('${s}')">${s}</span><div class="btn-group"><button class="edit-btn" onclick="editSite(${i})">Rename</button><button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button></div></div>`).join('');
 
-            // Sites List (with Edit and View)
-            document.getElementById('site-list').innerHTML = sites.map((s, i) => `
-                <div class="list-item">
-                    <span class="clickable-site" onclick="viewSiteDetail('${s}')">${s}</span>
-                    <div class="btn-group">
-                        <button class="edit-btn" onclick="editSite(${i})">Rename</button>
-                        <button class="delete-btn" onclick="deleteItem('sites', ${i})">X</button>
-                    </div>
-                </div>`).join('');
-
-            // Stats per Glider
             const gStats = {};
             flights.forEach(f => {
                 if(!gStats[f.glider]) gStats[f.glider] = {c:0, t:0};
                 gStats[f.glider].c++; gStats[f.glider].t += f.dur;
             });
-            document.getElementById('glider-stats-list').innerHTML = Object.entries(gStats).map(([n, d]) => 
-                `<div class="list-item"><span>${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`
-            ).join('') || "No data.";
+            document.getElementById('glider-stats-list').innerHTML = Object.entries(gStats).map(([n, d]) => `<div class="list-item"><span>${n}</span><span>${d.c} fl | ${Math.floor(d.t/60)}h ${d.t%60}m</span></div>`).join('') || "No data.";
         }
 
         function saveData() {
@@ -217,7 +261,7 @@
             refreshUI();
         }
 
-        function clearAllData() { if(confirm("Delete all?")) { localStorage.clear(); location.reload(); } }
+        function clearAllData() { if(confirm("Delete EVERYTHING?")) { localStorage.clear(); location.reload(); } }
 
         function exportCSV() {
             let csv = "Date,T/O Site,Distance (km),Duration,Glider\n";
