@@ -27,6 +27,7 @@
         .flight-card { border-left: 4px solid #007bff; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.9rem; position: relative; }
         .clickable-site, .clickable-glider { color: #007bff; text-decoration: underline; cursor: pointer; }
         .import-area { border: 2px dashed #444; padding: 15px; margin-top: 10px; text-align: center; border-radius: 8px; }
+        #edit-indicator { display: none; background: #ffc107; color: black; padding: 5px; margin-bottom: 10px; border-radius: 4px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -45,7 +46,8 @@
             <div><small>Total Flights</small><h2 id="main-total-flights">0</h2></div>
             <div><small>Total Airtime</small><h2 id="main-total-time">0h 0m</h2></div>
         </div>
-        <h3>Log New Flight</h3>
+        <div id="edit-indicator">EDITING FLIGHT</div>
+        <h3 id="form-title">Log New Flight</h3>
         <label>Date</label><input type="date" id="flight-date">
         <label>Glider *</label><select id="glider-select"></select>
         <label>Take-off Site *</label><select id="site-select"></select>
@@ -54,7 +56,8 @@
         <div style="display: flex; gap: 10px;">
             <input type="number" id="dur-h" placeholder="Hrs"><input type="number" id="dur-m" placeholder="Min">
         </div>
-        <button onclick="saveFlight()" style="width:100%; background: #007bff; color:white; margin-top: 10px;">Save Flight</button>
+        <button id="save-btn" onclick="saveFlight()" style="width:100%; background: #007bff; color:white; margin-top: 10px;">Save Flight</button>
+        <button id="cancel-edit-btn" onclick="cancelEdit()" style="display:none; width:100%; background: #444; color:white; margin-top: 5px;">Cancel Edit</button>
     </div>
 
     <div id="history-page" class="page">
@@ -112,6 +115,7 @@
         let flights = JSON.parse(localStorage.getItem('flights')) || [];
         let gliders = JSON.parse(localStorage.getItem('gliders')) || [];
         let sites = JSON.parse(localStorage.getItem('sites')) || [];
+        let editingFlightIndex = null;
 
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
@@ -149,45 +153,35 @@
         }
 
         function editFlight(originalFlight) {
-            const index = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
-            if (index === -1) return;
+            editingFlightIndex = flights.findIndex(f => JSON.stringify(f) === JSON.stringify(originalFlight));
+            if (editingFlightIndex === -1) return;
 
-            const newDate = prompt("Date (YYYY-MM-DD):", flights[index].date);
-            if (!newDate) return;
+            const f = flights[editingFlightIndex];
+            document.getElementById('flight-date').value = f.date;
+            document.getElementById('glider-select').value = f.glider;
+            document.getElementById('site-select').value = f.site;
+            document.getElementById('distance').value = f.dist;
+            document.getElementById('dur-h').value = Math.floor(f.dur / 60);
+            document.getElementById('dur-m').value = f.dur % 60;
 
-            const newGlider = prompt("Glider Name:", flights[index].glider);
-            if (!newGlider) return;
+            document.getElementById('edit-indicator').style.display = 'block';
+            document.getElementById('form-title').innerText = "Edit Flight";
+            document.getElementById('save-btn').innerText = "Update Flight";
+            document.getElementById('cancel-edit-btn').style.display = 'block';
 
-            const newSite = prompt("Take-off Site:", flights[index].site);
-            if (!newSite) return;
+            showPage('log-page');
+        }
 
-            const newDist = prompt("Distance (km) - optional:", flights[index].dist);
-            const rawDur = prompt("Duration (Minutes or H:MM) - optional:", `${Math.floor(flights[index].dur/60)}h ${flights[index].dur%60}m`);
-
-            let finalMins = 0;
-            if (rawDur && rawDur.includes(":")) {
-                let p = rawDur.replace(/[h m]/g, "").split(":");
-                finalMins = (parseInt(p[0]) * 60) + (parseInt(p[1]) || 0);
-            } else {
-                finalMins = parseInt(rawDur) || 0;
-            }
-
-            // Ensure new glider/site exists in dropdowns
-            if (!gliders.includes(newGlider)) { gliders.push(newGlider); gliders.sort(); }
-            if (!sites.includes(newSite)) { sites.push(newSite); sites.sort(); }
-
-            flights[index].date = newDate;
-            flights[index].glider = newGlider;
-            flights[index].site = newSite;
-            flights[index].dist = newDist || 0;
-            flights[index].dur = finalMins;
-
-            saveData();
-            const currentPage = document.querySelector('.active-page').id;
-            if(currentPage === 'site-detail-page') viewSiteDetail(document.getElementById('detail-site-name').innerText);
-            else if(currentPage === 'glider-detail-page') viewGliderDetail(document.getElementById('detail-glider-name').innerText);
-            else renderHistory('flight-history-list', flights);
-            refreshUI();
+        function cancelEdit() {
+            editingFlightIndex = null;
+            document.getElementById('edit-indicator').style.display = 'none';
+            document.getElementById('form-title').innerText = "Log New Flight";
+            document.getElementById('save-btn').innerText = "Save Flight";
+            document.getElementById('cancel-edit-btn').style.display = 'none';
+            document.getElementById('flight-date').valueAsDate = new Date();
+            document.getElementById('distance').value = "";
+            document.getElementById('dur-h').value = "";
+            document.getElementById('dur-m').value = "";
         }
 
         function viewSiteDetail(siteName) {
@@ -220,11 +214,22 @@
             const g = document.getElementById('glider-select').value;
             const s = document.getElementById('site-select').value;
             if(!date || !g || !s) return alert("Required fields missing.");
-            flights.push({
+            
+            const flightData = {
                 date, glider: g, site: s,
                 dist: document.getElementById('distance').value || 0,
                 dur: (parseInt(document.getElementById('dur-h').value) || 0) * 60 + (parseInt(document.getElementById('dur-m').value) || 0)
-            });
+            };
+
+            if (editingFlightIndex !== null) {
+                flights[editingFlightIndex] = flightData;
+                alert("Flight updated!");
+                cancelEdit();
+            } else {
+                flights.push(flightData);
+                alert("Flight saved!");
+            }
+            
             saveData(); refreshUI();
         }
 
