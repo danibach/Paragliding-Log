@@ -20,6 +20,8 @@
         .active-page { display: block; }
         .stats-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; }
         .stats-summary h2 { margin: 0; color: #007bff; }
+        .stats-summary .ytd-label { color: #aaa; font-size: 0.75rem; margin-top: 8px; display: block; }
+        .stats-summary .ytd-value { color: #28a745; font-size: 1.1rem; font-weight: bold; margin: 0; }
         .list-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 4px; }
         .btn-group { display: flex; gap: 5px; }
         .delete-btn { background: #ff4444; color: white; padding: 2px 8px; border: none; border-radius: 4px; font-size: 0.7rem; }
@@ -43,8 +45,16 @@
 
     <div id="log-page" class="page active-page">
         <div class="stats-summary">
-            <div><small>Total Flights</small><h2 id="main-total-flights">0</h2></div>
-            <div><small>Total Airtime</small><h2 id="main-total-time">0h 0m</h2></div>
+            <div>
+                <small>Total Flights</small><h2 id="main-total-flights">0</h2>
+                <span class="ytd-label">YTD Flights</span>
+                <p class="ytd-value" id="main-ytd-flights">0</p>
+            </div>
+            <div>
+                <small>Total Airtime</small><h2 id="main-total-time">0h 0m</h2>
+                <span class="ytd-label">YTD Airtime</span>
+                <p class="ytd-value" id="main-ytd-time">0h 0m</p>
+            </div>
         </div>
         <div id="edit-indicator">EDITING FLIGHT</div>
         <h3 id="form-title">Log New Flight</h3>
@@ -303,6 +313,14 @@
             const totalF = flights.length + offC, totalM = flights.reduce((s, f) => s + f.dur, 0) + (offH * 60);
             document.getElementById('main-total-flights').innerText = totalF;
             document.getElementById('main-total-time').innerText = `${Math.floor(totalM/60)}h ${totalM%60}m`;
+
+            // YTD stats: filter flights to the current calendar year only
+            const currentYear = new Date().getFullYear();
+            const ytdFlights = flights.filter(f => new Date(f.date).getFullYear() === currentYear);
+            const ytdM = ytdFlights.reduce((s, f) => s + f.dur, 0);
+            document.getElementById('main-ytd-flights').innerText = ytdFlights.length;
+            document.getElementById('main-ytd-time').innerText = `${Math.floor(ytdM/60)}h ${ytdM%60}m`;
+
             document.getElementById('glider-select').innerHTML = gliders.map(g => `<option value="${g}">${g}</option>`).join('');
             document.getElementById('site-select').innerHTML = sites.map(s => `<option value="${s}">${s}</option>`).join('');
             document.getElementById('glider-list').innerHTML = gliders.map((g, i) => `<div class="list-item"><span class="clickable-glider" onclick="viewGliderDetail('${g}')">${g}</span><button class="delete-btn" onclick="deleteItem('gliders', ${i})">X</button></div>`).join('');
